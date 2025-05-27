@@ -1,0 +1,27 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }} #ここ変更しない
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }} #ここ変更しない
+          aws-region: us-east-1 # ここに注意。s3で使用されているリージョンではなくCloudFrontのリージョンを設定する。ここではACMを用いて構築しているためus-east-01がデフォルト。
+
+      # S3へのデプロイ（リポジトリのルートからS3へ同期）
+      - name: Deploy to S3
+        run: aws s3 sync ./ s3://${{ secrets.S3_BUCKET_NAME }} --delete --exclude ".git/*" --exclude ".github/*" --exclude "README.md" --exclude ".gitignore"
+
+      # CloudFrontのキャッシュ無効化
+      - name: Invalidate CloudFront
+        run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
